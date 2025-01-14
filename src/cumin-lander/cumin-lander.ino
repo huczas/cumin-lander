@@ -71,12 +71,12 @@ unsigned long previousSecond = 0;
 const long interval = 1000;
 
 int notes[] = { 0,
-                /* C,  C#,   D,  D#,   E,   F,  F#,   G,  G#,   A,  A#,   B */
-                3817, 3597, 3401, 3205, 3030, 2857, 2703, 2551, 2404, 2273, 2146, 2024,  // 3 (1-12)
-                1908, 1805, 1701, 1608, 1515, 1433, 1351, 1276, 1205, 1136, 1073, 1012,  // 4 (13-24)
-                956, 903, 852, 804, 759, 716, 676, 638, 602, 568, 536, 506,              // 5 (25-37)
-                478, 451, 426, 402, 379, 358, 338, 319, 301, 284, 268, 253,              // 6 (38-50)
-                239, 226, 213, 201, 190, 179, 169, 159, 151, 142, 134, 127 };            // 7 (51-62)
+/* C,  C#,   D,  D#,   E,   F,  F#,   G,  G#,   A,  A#,   B */
+3817, 3597, 3401, 3205, 3030, 2857, 2703, 2551, 2404, 2273, 2146, 2024,  // 3 (1-12)
+1908, 1805, 1701, 1608, 1515, 1433, 1351, 1276, 1205, 1136, 1073, 1012,  // 4 (13-24)
+956, 903, 852, 804, 759, 716, 676, 638, 602, 568, 536, 506,              // 5 (25-37)
+478, 451, 426, 402, 379, 358, 338, 319, 301, 284, 268, 253,              // 6 (38-50)
+239, 226, 213, 201, 190, 179, 169, 159, 151, 142, 134, 127 };            // 7 (51-62)
 
 #define NOTE_G3 2551
 #define NOTE_G4 1276
@@ -85,6 +85,9 @@ int notes[] = { 0,
 #define NOTE_G5 638
 #define RELEASE 20
 #define BPM 100
+
+bool ledsEnabled = true;
+bool screenEnabled = true;
 
 // notes in the melody:
 int melody[] = { NOTE_E5, NOTE_E5, 0, NOTE_E5, 0, NOTE_C5, NOTE_E5, 0, NOTE_G5, 0, 0, NOTE_G4 };
@@ -171,6 +174,22 @@ void loop() {
       // Process the input string when a newline character is received
       if (inputString == "info") {
         bleuart.print("Type time in format: HHMMSS, to set new time.\n");
+        bleuart.print("Type 'leds on' or 'leds off' to enable/disable blinking LEDs.\n");
+        bleuart.print("Type 'screen on' or 'screen off' to enable/disable the screen.\n");
+      } else if (inputString == "leds on") {
+        ledsEnabled = true;
+        bleuart.print("Blinking LEDs enabled.\n");
+      } else if (inputString == "leds off") {
+        ledsEnabled = false;
+        bleuart.print("Blinking LEDs disabled.\n");
+      } else if (inputString == "screen on") {
+        screenEnabled = true;
+        bleuart.print("Screen enabled.\n");
+      } else if (inputString == "screen off") {
+        screenEnabled = false;
+        bleuart.print("Screen disabled.\n");
+        display.clearDisplay();
+        display.display();
       } else if (inputString.length() == 6 && isDigit(inputString[0])) {
         for (int i = 0; i < 6; i++) {
           myTime[i] = inputString[i] - '0';
@@ -191,60 +210,39 @@ void loop() {
     }
   }
 
-  canvas.fillScreen(0);
-  canvas.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  // Draw white text
-  canvas.setRotation(1);
-  canvas.drawLine(0, 10, 32, 10, SSD1306_WHITE);
-  canvas.drawLine(0, 84, 32, 84, SSD1306_WHITE);
+  if (screenEnabled) {
+    canvas.fillScreen(0);
+    canvas.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  // Draw white text
+    canvas.setRotation(1);
+    canvas.drawLine(0, 10, 32, 10, SSD1306_WHITE);
+    canvas.drawLine(0, 84, 32, 84, SSD1306_WHITE);
 
-  time_t t = now();
+    time_t t = now();
 
-  int tempC = bme.readTemperature();  //sht31.readTemperature();
-  int humi = bme.readHumidity();      //sht31.readHumidity();
-  int pressure_hPa = bme.readPressure() / 100.0;
-  int altitude_m = bme.readAltitude(SEALEVELPRESSURE_HPA);
+    int tempC = bme.readTemperature();  //sht31.readTemperature();
+    int humi = bme.readHumidity();      //sht31.readHumidity();
+    int pressure_hPa = bme.readPressure() / 100.0;
+    int altitude_m = bme.readAltitude(SEALEVELPRESSURE_HPA);
 
+    sprintf(timeHour, "%02d", hour(t));
+    sprintf(timeMinute, "%02d", minute(t));
+    sprintf(timeSecond, "%02d", second(t));
 
-  //  sprintf(temperature, "  %02dC", tempC);
-  //  sprintf(humidity, "  %02d%%", humi);
-  //  sprintf(pressure, "  %02dhPa", pressure_hPa);
-  //  sprintf(altitude, "  %02dhPa", altitude_m);
-  //
-  sprintf(timeHour, "%02d", hour(t));
-  sprintf(timeMinute, "%02d", minute(t));
-  sprintf(timeSecond, "%02d", second(t));
+    canvas.setFont();
+    canvas.setTextSize(1);
+    canvas.setCursor(0, 0);  // Start at top-left corner
+    canvas.print("/////");
+    canvas.setCursor(0, 15);
 
-  canvas.setFont();
-  canvas.setTextSize(1);
-  canvas.setCursor(0, 0);  // Start at top-left corner
-  canvas.print("/////");
-  //canvas.print(myTime);
-  canvas.setCursor(0, 15);
-  // if (isPM()) canvas.print(F("   PM"));
-  // else canvas.print(F("   AM"));
+    canvas.setFont(&DSEG7_Classic_Mini_Regular_15);
+    canvas.setCursor(5, 40);
+    canvas.print(timeHour);
 
+    canvas.setCursor(5, 60);
+    canvas.print(timeMinute);
 
-  //display.setTextSize(2);
-  canvas.setFont(&DSEG7_Classic_Mini_Regular_15);
-  canvas.setCursor(5, 40);
-  canvas.print(timeHour);
-
-  canvas.setCursor(5, 60);
-  canvas.print(timeMinute);
-
-  canvas.setCursor(5, 80);
-  canvas.print(timeSecond);
-
-  //unsigned long currentSecond = second(t);
-
-  //if (currentSecond - previousSecond >= 2)
-  {
-    //  previousSecond = currentSecond;
-
-    //    Serial.println(tempC);
-    //    Serial.println(humi);
-    //    Serial.println(pressure_hPa);
-    //    Serial.println(altitude_m);
+    canvas.setCursor(5, 80);
+    canvas.print(timeSecond);
 
     canvas.setFont();
     canvas.setTextSize(1);
@@ -271,23 +269,24 @@ void loop() {
       canvas.print(pressure_hPa);
       canvas.print("hPa");
     } else Serial.println("Failed to read humidity");
+
+    display.drawBitmap(0, 0, canvas.getBuffer(), 128, 32, 1, 0);
+    display.display();
   }
 
-  display.drawBitmap(0, 0, canvas.getBuffer(), 128, 32, 1, 0);
-  display.display();
-  //display.startscrolldiagright(0x0F, 0x0F);
-
-  for (int i = 0; i < 5; i++) {
-    digitalWrite(GREEN_LED, HIGH);
-    delay(20);
-    digitalWrite(GREEN_LED, LOW);
-    delay(60);
-  }
-  for (int i = 0; i < 5; i++) {
-    digitalWrite(RED_LED, HIGH);
-    delay(10);
-    digitalWrite(RED_LED, LOW);
-    delay(50);
+  if (ledsEnabled) {
+    for (int i = 0; i < 5; i++) {
+      digitalWrite(GREEN_LED, HIGH);
+      delay(20);
+      digitalWrite(GREEN_LED, LOW);
+      delay(60);
+    }
+    for (int i = 0; i < 5; i++) {
+      digitalWrite(RED_LED, HIGH);
+      delay(10);
+      digitalWrite(RED_LED, LOW);
+      delay(50);
+    }
   }
   delay(400);
 }
