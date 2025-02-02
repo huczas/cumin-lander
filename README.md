@@ -19,14 +19,14 @@ I used the Arduino IDE v1.8.13 to compile and flash the code on to the nRF52840.
 ## FORKED MODS
 
 I can confirm working on Arduino IDE 2.3.4,
-libraries versions:
-Adafruit BME280 - 2.2.4
-Adafruit BusIO - 1.16.3
-Adafruit GFX - 1.11.11
-Adafruit SSD1306 - 2.5.13
-Adafruit Unified Sensor - 1.1.15
-Time - 1.6.1
+libraries versions:  
+Adafruit BME280 - 2.2.4  
+Adafruit BusIO - 1.16.3  
+Adafruit GFX - 1.11.11  
+Adafruit SSD1306 - 2.5.13  
+Adafruit Unified Sensor - 1.1.15  
+Time - 1.6.1  
 
-I have added UART menu to handle Enable/Disable Leds and screen.
+I have added UART menu to handle Enable/Disable Leds, screen, play melody on demand, handle alarm and check its status.
 
-In plan is to add sleep time for night and woke up alarm.
+plan to add deep sleep for choosen time
