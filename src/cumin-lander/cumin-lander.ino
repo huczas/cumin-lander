@@ -88,6 +88,10 @@ int notes[] = { 0,
 
 bool ledsEnabled = true;
 bool screenEnabled = true;
+bool alarmEnabled = false;
+uint8_t alarmHour = 0;
+uint8_t alarmMinute = 0;
+uint8_t alarmSecond = 0;
 
 // notes in the melody:
 int melody[] = { NOTE_E5, NOTE_E5, 0, NOTE_E5, 0, NOTE_C5, NOTE_E5, 0, NOTE_G5, 0, 0, NOTE_G4 };
@@ -97,6 +101,7 @@ int noteDurations[] = { 4, 4, 4, 4, 4, 4, 4, 4, 4, 2, 4, 4 };
 
 uint8_t myTime[6];
 int serialindex = 0;
+int lastHour = -1; // Variable to keep track of the last hour
 
 void setup() {
   Serial.begin(9600);
@@ -120,9 +125,9 @@ void setup() {
   }
   noTone(speakerPin);
   digitalWrite(speakerPin, LOW);
-  //  tone(speakerPin,1000,100);
-  //  delay(50);
-  //  tone(speakerPin,4000,200);
+  tone(speakerPin,1000,100);
+  delay(50);
+  tone(speakerPin,4000,200);
 
   //turn OFF all LEDs
   digitalWrite(GREEN_LED, LOW);
@@ -131,7 +136,7 @@ void setup() {
 
   //while(!Serial);
   // hourFormat12();
-  setTime(19, 27, 36, 17, 1, 2024);
+  setTime(12, 00, 00, 1, 1, 2025);
 
 
   // default settings
@@ -162,6 +167,16 @@ void setup() {
   display.display();
 }
 
+void playMelody() {
+  for (int thisNote = 0; thisNote < 12; thisNote++) {
+    int noteDuration = 60 * 1000 / BPM / noteDurations[thisNote];
+    tone(speakerPin, (melody[thisNote] != 0) ? (500000 / melody[thisNote]) : 0, noteDuration - RELEASE);
+    delay(noteDuration);
+  }
+  noTone(speakerPin);
+  digitalWrite(speakerPin, LOW);
+}
+
 void loop() {
   uint8_t ch;
   // Forward from BLEUART to HW Serial
@@ -176,6 +191,10 @@ void loop() {
         bleuart.print("Type time in format: HHMMSS, to set new time.\n");
         bleuart.print("Type 'leds on' or 'leds off' to enable/disable blinking LEDs.\n");
         bleuart.print("Type 'screen on' or 'screen off' to enable/disable the screen.\n");
+        bleuart.print("Type 'melody' to play the melody.\n");
+        bleuart.print("Type 'alarm off' to disable the alarm.\n");
+        bleuart.print("Type 'alarm HHMMSS' to set the alarm time.\n");
+        bleuart.print("Type 'alarm ?' to check the current alarm status.\n");
       } else if (inputString == "leds on") {
         ledsEnabled = true;
         bleuart.print("Blinking LEDs enabled.\n");
@@ -190,6 +209,35 @@ void loop() {
         bleuart.print("Screen disabled.\n");
         display.clearDisplay();
         display.display();
+      } else if (inputString == "melody") {
+        bleuart.print("Playing melody.\n");
+        playMelody();
+      } else if (inputString.startsWith("alarm ")) {
+        String alarmTime = inputString.substring(6);
+        if (alarmTime == "off") {
+          alarmEnabled = false;
+          bleuart.print("Alarm disabled.\n");
+        } else if (alarmTime == "?") {
+          if (alarmEnabled) {
+            char alarmBuffer[9];
+            sprintf(alarmBuffer, "%02d%02d%02d", alarmHour, alarmMinute, alarmSecond);
+            bleuart.print("Alarm is set to: ");
+            bleuart.print(alarmBuffer);
+            bleuart.print("\n");
+          } else {
+            bleuart.print("Alarm is off.\n");
+          }
+        } else if (alarmTime.length() == 6 && isDigit(alarmTime[0])) {
+          alarmHour = (alarmTime[0] - '0') * 10 + (alarmTime[1] - '0');
+          alarmMinute = (alarmTime[2] - '0') * 10 + (alarmTime[3] - '0');
+          alarmSecond = (alarmTime[4] - '0') * 10 + (alarmTime[5] - '0');
+          alarmEnabled = true;
+          bleuart.print("Alarm set to: ");
+          bleuart.print(alarmTime);
+          bleuart.print("\n");
+        } else {
+          bleuart.print("Invalid alarm format.\n");
+        }
       } else if (inputString.length() == 6 && isDigit(inputString[0])) {
         for (int i = 0; i < 6; i++) {
           myTime[i] = inputString[i] - '0';
@@ -272,6 +320,23 @@ void loop() {
 
     display.drawBitmap(0, 0, canvas.getBuffer(), 128, 32, 1, 0);
     display.display();
+  }
+
+  // Check if the hour has changed
+  int currentHour = hour();
+  if (currentHour != lastHour) {
+    // Play beep sound
+    tone(speakerPin, 1000, 200); // 1000 Hz for 200 ms
+    lastHour = currentHour;
+  }
+
+  // Check if the alarm time matches the current time
+  if (alarmEnabled && hour() == alarmHour && minute() == alarmMinute && second() == alarmSecond) {
+    for (int i = 0; i < 2; i++) {
+      playMelody();
+      delay(50);
+    }
+    // alarmEnabled = false; // Disable the alarm after it has been triggered
   }
 
   if (ledsEnabled) {
