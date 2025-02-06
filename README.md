@@ -27,6 +27,13 @@ Adafruit SSD1306 - 2.5.13
 Adafruit Unified Sensor - 1.1.15  
 Time - 1.6.1  
 
-I have added UART menu to handle Enable/Disable Leds, screen, play melody on demand, handle alarm and check its status.
+I have added UART menu to handle:  
 
-plan to add deep sleep for choosen time
+- Enable/Disable Leds
+- enable/Disable screen
+- play melody
+- set alarm and check alarm status
+
+Plan:
+
+- add deep sleep for choosen time

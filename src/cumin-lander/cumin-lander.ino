@@ -89,9 +89,14 @@ int notes[] = { 0,
 bool ledsEnabled = true;
 bool screenEnabled = true;
 bool alarmEnabled = false;
+bool sleepEnabled = false;
 uint8_t alarmHour = 0;
 uint8_t alarmMinute = 0;
 uint8_t alarmSecond = 0;
+uint8_t sleepStartHour = 0;
+uint8_t sleepStartMinute = 0;
+uint8_t sleepEndHour = 0;
+uint8_t sleepEndMinute = 0;
 
 // notes in the melody:
 int melody[] = { NOTE_E5, NOTE_E5, 0, NOTE_E5, 0, NOTE_C5, NOTE_E5, 0, NOTE_G5, 0, 0, NOTE_G4 };
@@ -177,6 +182,13 @@ void playMelody() {
   digitalWrite(speakerPin, LOW);
 }
 
+void enterDeepSleep() {
+  // Code to enter deep sleep mode
+  // This is platform-specific and may require additional libraries or settings
+  // For example, on an ESP32, you might use:
+  // esp_deep_sleep_start();
+}
+
 void loop() {
   uint8_t ch;
   // Forward from BLEUART to HW Serial
@@ -193,8 +205,9 @@ void loop() {
         bleuart.print("Type 'screen on' or 'screen off' to enable/disable the screen.\n");
         bleuart.print("Type 'melody' to play the melody.\n");
         bleuart.print("Type 'alarm off' to disable the alarm.\n");
-        bleuart.print("Type 'alarm HHMMSS' to set the alarm time.\n");
+        bleuart.print("Type 'alarm HHMM' to set the alarm time.\n");
         bleuart.print("Type 'alarm ?' to check the current alarm status.\n");
+        bleuart.print("Type 'sleep from HHMM to HHMM' to set the sleep time range.\n");
       } else if (inputString == "leds on") {
         ledsEnabled = true;
         bleuart.print("Blinking LEDs enabled.\n");
@@ -219,24 +232,47 @@ void loop() {
           bleuart.print("Alarm disabled.\n");
         } else if (alarmTime == "?") {
           if (alarmEnabled) {
-            char alarmBuffer[9];
-            sprintf(alarmBuffer, "%02d%02d%02d", alarmHour, alarmMinute, alarmSecond);
+            char alarmBuffer[5];
+            sprintf(alarmBuffer, "%02d%02d", alarmHour, alarmMinute);
             bleuart.print("Alarm is set to: ");
             bleuart.print(alarmBuffer);
             bleuart.print("\n");
           } else {
             bleuart.print("Alarm is off.\n");
           }
-        } else if (alarmTime.length() == 6 && isDigit(alarmTime[0])) {
+        } else if (alarmTime.length() == 4 && isDigit(alarmTime[0])) {
           alarmHour = (alarmTime[0] - '0') * 10 + (alarmTime[1] - '0');
           alarmMinute = (alarmTime[2] - '0') * 10 + (alarmTime[3] - '0');
-          alarmSecond = (alarmTime[4] - '0') * 10 + (alarmTime[5] - '0');
+          alarmSecond = 0; // Assume seconds are always 00
           alarmEnabled = true;
           bleuart.print("Alarm set to: ");
           bleuart.print(alarmTime);
           bleuart.print("\n");
         } else {
           bleuart.print("Invalid alarm format.\n");
+        }
+      } else if (inputString.startsWith("sleep from ")) {
+        String sleepTimes = inputString.substring(11);
+        if (sleepTimes.length() == 9 && sleepTimes[4] == 't' && sleepTimes[5] == 'o') {
+          String start = sleepTimes.substring(0, 4);
+          String end = sleepTimes.substring(6, 10);
+          if (isDigit(start[0]) && isDigit(start[1]) && isDigit(start[2]) && isDigit(start[3]) &&
+              isDigit(end[0]) && isDigit(end[1]) && isDigit(end[2]) && isDigit(end[3])) {
+            sleepStartHour = (start[0] - '0') * 10 + (start[1] - '0');
+            sleepStartMinute = (start[2] - '0') * 10 + (start[3] - '0');
+            sleepEndHour = (end[0] - '0') * 10 + (end[1] - '0');
+            sleepEndMinute = (end[2] - '0') * 10 + (end[3] - '0');
+            sleepEnabled = true;
+            bleuart.print("Sleep time set from ");
+            bleuart.print(start);
+            bleuart.print(" to ");
+            bleuart.print(end);
+            bleuart.print("\n");
+          } else {
+            bleuart.print("Invalid sleep time format.\n");
+          }
+        } else {
+          bleuart.print("Invalid sleep time format.\n");
         }
       } else if (inputString.length() == 6 && isDigit(inputString[0])) {
         for (int i = 0; i < 6; i++) {
@@ -262,13 +298,18 @@ void loop() {
     canvas.fillScreen(0);
     canvas.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  // Draw white text
     canvas.setRotation(1);
-    canvas.drawLine(0, 10, 32, 10, SSD1306_WHITE);
-    canvas.drawLine(0, 84, 32, 84, SSD1306_WHITE);
+    canvas.drawLine(0, 10, 32, 10, SSD1306_WHITE); // Draw a line
+    canvas.drawLine(0, 84, 32, 84, SSD1306_WHITE); // Draw a line
 
-    time_t t = now();
+    if (alarmEnabled) {
+        canvas.setCursor(0, 15); // Set cursor below the first line
+        canvas.print("ALARM");
+    }
 
-    int tempC = bme.readTemperature();  //sht31.readTemperature();
-    int humi = bme.readHumidity();      //sht31.readHumidity();
+    time_t t = now(); // Get the current time
+
+    int tempC = bme.readTemperature();
+    int humi = bme.readHumidity();
     int pressure_hPa = bme.readPressure() / 100.0;
     int altitude_m = bme.readAltitude(SEALEVELPRESSURE_HPA);
 
@@ -331,12 +372,31 @@ void loop() {
   }
 
   // Check if the alarm time matches the current time
-  if (alarmEnabled && hour() == alarmHour && minute() == alarmMinute && second() == alarmSecond) {
+  if (alarmEnabled && hour() == alarmHour && minute() == alarmMinute) {
     for (int i = 0; i < 2; i++) {
       playMelody();
       delay(50);
     }
     // alarmEnabled = false; // Disable the alarm after it has been triggered
+  }
+
+  // Check if the current time is within the sleep range
+  if (sleepEnabled) {
+    int currentMinuteOfDay = hour() * 60 + minute();
+    int sleepStartMinuteOfDay = sleepStartHour * 60 + sleepStartMinute;
+    int sleepEndMinuteOfDay = sleepEndHour * 60 + sleepEndMinute;
+
+    if (sleepStartMinuteOfDay < sleepEndMinuteOfDay) {
+      // Sleep period does not cross midnight
+      if (currentMinuteOfDay >= sleepStartMinuteOfDay && currentMinuteOfDay < sleepEndMinuteOfDay) {
+        enterDeepSleep();
+      }
+    } else {
+      // Sleep period crosses midnight
+      if (currentMinuteOfDay >= sleepStartMinuteOfDay || currentMinuteOfDay < sleepEndMinuteOfDay) {
+        enterDeepSleep();
+      }
+    }
   }
 
   if (ledsEnabled) {
