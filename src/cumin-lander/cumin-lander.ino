@@ -22,9 +22,6 @@
 
 #include <bluefruit.h>
 #include <Adafruit_LittleFS.h>
-#include <InternalFileSystem.h>
-
-//#include "Adafruit_SHT31.h"
 
 // BLE Service
 BLEDfu bledfu;    // OTA DFU service
@@ -182,13 +179,6 @@ void playMelody() {
   digitalWrite(speakerPin, LOW);
 }
 
-void enterDeepSleep() {
-  // Code to enter deep sleep mode
-  // This is platform-specific and may require additional libraries or settings
-  // For example, on an ESP32, you might use:
-  // esp_deep_sleep_start();
-}
-
 void loop() {
   uint8_t ch;
   // Forward from BLEUART to HW Serial
@@ -207,7 +197,6 @@ void loop() {
         bleuart.print("Type 'alarm off' to disable the alarm.\n");
         bleuart.print("Type 'alarm HHMM' to set the alarm time.\n");
         bleuart.print("Type 'alarm ?' to check the current alarm status.\n");
-        bleuart.print("Type 'sleep from HHMM to HHMM' to set the sleep time range.\n");
       } else if (inputString == "leds on") {
         ledsEnabled = true;
         bleuart.print("Blinking LEDs enabled.\n");
@@ -250,29 +239,6 @@ void loop() {
           bleuart.print("\n");
         } else {
           bleuart.print("Invalid alarm format.\n");
-        }
-      } else if (inputString.startsWith("sleep from ")) {
-        String sleepTimes = inputString.substring(11);
-        if (sleepTimes.length() == 9 && sleepTimes[4] == 't' && sleepTimes[5] == 'o') {
-          String start = sleepTimes.substring(0, 4);
-          String end = sleepTimes.substring(6, 10);
-          if (isDigit(start[0]) && isDigit(start[1]) && isDigit(start[2]) && isDigit(start[3]) &&
-              isDigit(end[0]) && isDigit(end[1]) && isDigit(end[2]) && isDigit(end[3])) {
-            sleepStartHour = (start[0] - '0') * 10 + (start[1] - '0');
-            sleepStartMinute = (start[2] - '0') * 10 + (start[3] - '0');
-            sleepEndHour = (end[0] - '0') * 10 + (end[1] - '0');
-            sleepEndMinute = (end[2] - '0') * 10 + (end[3] - '0');
-            sleepEnabled = true;
-            bleuart.print("Sleep time set from ");
-            bleuart.print(start);
-            bleuart.print(" to ");
-            bleuart.print(end);
-            bleuart.print("\n");
-          } else {
-            bleuart.print("Invalid sleep time format.\n");
-          }
-        } else {
-          bleuart.print("Invalid sleep time format.\n");
         }
       } else if (inputString.length() == 6 && isDigit(inputString[0])) {
         for (int i = 0; i < 6; i++) {
@@ -378,25 +344,6 @@ void loop() {
       delay(50);
     }
     // alarmEnabled = false; // Disable the alarm after it has been triggered
-  }
-
-  // Check if the current time is within the sleep range
-  if (sleepEnabled) {
-    int currentMinuteOfDay = hour() * 60 + minute();
-    int sleepStartMinuteOfDay = sleepStartHour * 60 + sleepStartMinute;
-    int sleepEndMinuteOfDay = sleepEndHour * 60 + sleepEndMinute;
-
-    if (sleepStartMinuteOfDay < sleepEndMinuteOfDay) {
-      // Sleep period does not cross midnight
-      if (currentMinuteOfDay >= sleepStartMinuteOfDay && currentMinuteOfDay < sleepEndMinuteOfDay) {
-        enterDeepSleep();
-      }
-    } else {
-      // Sleep period crosses midnight
-      if (currentMinuteOfDay >= sleepStartMinuteOfDay || currentMinuteOfDay < sleepEndMinuteOfDay) {
-        enterDeepSleep();
-      }
-    }
   }
 
   if (ledsEnabled) {
